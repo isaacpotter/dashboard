@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Isaac — Task Dashboard</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #080806;
+  --card:      #151515;
+  --t1:        #edebe4;
+  --t2:        rgba(237,235,228,0.72);
+  --t3:        rgba(237,235,228,0.48);
+  --rule:      rgba(237,235,228,0.24);
+  --border:    rgba(237,235,228,0.16);
+  --radius:    6px;
+  --high:      #8c5c2a;
+  --high-text: #c47a3a;
+  --med:       #6b6b45;
+  --med-text:  #9a9a60;
+  --low:       #3e5250;
+  --low-text:  #6a9e98;
+  --jira:      #4e5e32;
+  --slack:     #3e5250;
+  --email:     #6b6b45;
+}
+
+html, body { min-height: 100%; }
+
+body {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--t1);
+  padding: 64px clamp(16px, 2vw, 28px) 96px;
+  position: relative;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.045;
+  pointer-events: none;
+  z-index: 999;
+  mix-blend-mode: multiply;
+}
+
+.container { width: 100%; }
+
+.header {
+  border-top: 1px solid var(--rule);
+  padding-top: 36px;
+  margin-bottom: 28px;
+}
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 28px;
+}
+.header-eyebrow {
+  font-size: 10px; font-weight: 200; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--t3);
+}
+.header-updated {
+  font-size: 10px; font-weight: 200; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--t3);
+}
+.header-title {
+  font-size: 80px; font-weight: 600; letter-spacing: -0.025em;
+  line-height: 0.92; color: var(--t1); margin-bottom: 36px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 48px;
+}
+.stat {
+  padding: 22px 0 22px 28px;
+  border-right: 1px solid var(--rule);
+}
+.stat:first-child { padding-left: 0; }
+.stat:last-child  { border-right: none; }
+.stat-n {
+  font-size: 40px; font-weight: 600; letter-spacing: -0.03em;
+  line-height: 1; color: var(--t1); margin-bottom: 5px;
+}
+.stat-label {
+  font-size: 9px; font-weight: 200; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--t3);
+}
+
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 48px;
+  align-items: start;
+}
+
+.section-label {
+  font-size: 9px; font-weight: 200; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--t3);
+  margin-bottom: 16px;
+}
+
+.filter-bar {
+  display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap; margin-bottom: 20px;
+}
+.filter-divider {
+  width: 1px; height: 18px; background: var(--border); margin: 0 4px;
+}
+.filter-pill {
+  font-size: 9px; font-weight: 200; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--t2);
+  padding: 5px 12px; border-radius: 3px; cursor: pointer;
+  background: transparent; outline: 1px solid var(--border);
+  border: none; transition: background 0.15s, outline 0.15s;
+}
+.filter-pill.active { background: var(--med); outline: none; }
+.filter-pill:hover:not(.active) { outline-color: var(--rule); }
+
+.task-list { display: flex; flex-direction: column; gap: 14px; }
+
+.task-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px 16px;
+  display: grid;
+  grid-template-columns: 3px 1fr auto;
+  column-gap: 16px;
+  align-items: start;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s;
+}
+.task-card:hover { background: #1c1c1a; }
+.task-card.dismissed { display: none; }
+
+.task-bar { width: 3px; align-self: stretch; min-height: 40px; border-radius: 2px; }
+.task-bar.high  { background: var(--high); }
+.task-bar.med   { background: var(--med); }
+.task-bar.low   { background: var(--low); }
+
+.task-body { display: flex; flex-direction: column; gap: 5px; }
+
+.task-title { font-size: 14px; font-weight: 400; line-height: 1.35; color: var(--t1); }
+.task-card.done .task-title { color: var(--t3); text-decoration: line-through; }
+
+.task-meta {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 9px; font-weight: 200; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--t3);
+}
+
+.task-notes { font-size: 11px; font-weight: 300; line-height: 1.55; color: var(--t3); margin-top: 2px; }
+
+.task-aside { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; padding-top: 1px; }
+
+.source-pill { font-size: 8px; font-weight: 400; letter-spacing: 0.1em; text-transform: uppercase; color: var(--t1); padding: 4px 9px; }
+.source-pill.jira  { background: var(--jira); }
+.source-pill.slack { background: var(--slack); }
+.source-pill.email { background: var(--email); }
+
+.task-time { font-size: 9px; font-weight: 200; letter-spacing: 0.06em; color: var(--t3); white-space: nowrap; }
+
+.dismiss-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--t3); font-size: 14px; line-height: 1;
+  padding: 2px 4px; margin-top: 2px;
+  opacity: 0.5; transition: opacity 0.15s;
+}
+.dismiss-btn:hover { opacity: 1; color: var(--t1); }
+
+.cal-panel { position: sticky; top: 24px; }
+.cal-group { margin-bottom: 28px; }
+.cal-date-head {
+  font-size: 10px; font-weight: 400; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--t2);
+  padding-bottom: 10px; border-bottom: 1px solid var(--rule); margin-bottom: 2px;
+}
+.cal-row {
+  display: grid; grid-template-columns: 72px 1fr auto;
+  column-gap: 12px; align-items: start;
+  padding: 11px 0; border-bottom: 1px solid var(--border);
+}
+.cal-time { font-size: 10px; font-weight: 200; letter-spacing: 0.05em; color: var(--t3); padding-top: 1px; }
+.cal-title { font-size: 13px; font-weight: 400; line-height: 1.35; color: var(--t1); }
+.cal-row.personal .cal-title { color: var(--t3); font-style: italic; }
+.cal-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.platform-pill { font-size: 8px; font-weight: 400; letter-spacing: 0.1em; text-transform: uppercase; color: var(--t1); padding: 3px 7px; }
+.platform-pill.meet  { background: var(--low); }
+.platform-pill.zoom  { background: var(--med); }
+.platform-pill.teams { background: var(--high); }
+.cal-join { font-size: 9px; font-weight: 200; letter-spacing: 0.1em; text-transform: uppercase; color: var(--med-text); text-decoration: none; }
+.cal-join:hover { color: var(--t1); }
+.needs-dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--med-text); margin-left: 5px; vertical-align: middle; }
+
+@media (max-width: 900px) {
+  .header-title { font-size: 52px; }
+  .main-grid { grid-template-columns: 1fr; }
+  .cal-panel { position: static; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 500px) {
+  body { padding: 40px clamp(16px, 3vw, 24px) 64px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <header class="header">
+    <div class="header-top">
+      <span class="header-eyebrow">Isaac Potter &mdash; Task Dashboard</span>
+      <span class="header-updated" id="updated-time"></span>
+    </div>
+    <h1 class="header-title" id="day-title"></h1>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-n" id="stat-open">—</div><div class="stat-label">Open Tasks</div></div>
+    <div class="stat"><div class="stat-n" id="stat-high">—</div><div class="stat-label">High Priority</div></div>
+    <div class="stat"><div class="stat-n" id="stat-jira">—</div><div class="stat-label">Jira Items</div></div>
+    <div class="stat"><div class="stat-n" id="stat-inbox">—</div><div class="stat-label">Inbox Items</div></div>
+  </div>
+
+  <div class="main-grid">
+    <section class="tasks-panel">
+      <div class="filter-bar">
+        <button class="filter-pill active" data-filter="all" data-type="src">All</button>
+        <button class="filter-pill" data-filter="Jira" data-type="src">Jira</button>
+        <button class="filter-pill" data-filter="Slack" data-type="src">Slack</button>
+        <button class="filter-pill" data-filter="Email" data-type="src">Email</button>
+        <div class="filter-divider"></div>
+        <button class="filter-pill" data-filter="High" data-type="pri">High</button>
+        <button class="filter-pill" data-filter="Medium" data-type="pri">Med</button>
+        <button class="filter-pill" data-filter="Low" data-type="pri">Low</button>
+      </div>
+      <div class="task-list" id="task-list"></div>
+    </section>
+    <section class="cal-panel" id="cal-panel"></section>
+  </div>
+</div>
+
+<script>
+const DATA_PULLED_AT = '2026-04-01T14:55:00-04:00';
+const TASKS = [
+  { id: 'HLO-619', updatedAt: '2026-03-27T14:27:26.789-04:00', priority: 'Medium', task: 'Marketing LP Strategy & Design', project: 'HALO', source: 'Jira', ticket: 'HLO-619', status: 'Open', due: '', notes: 'Marketing landing page strategy and design work in progress.', url: '' },
+  { id: 'RAS-134', updatedAt: '2026-03-23T12:24:21.145-04:00', priority: 'Medium', task: 'Pricing Workshop - Goals & Agenda', project: "Rastelli's", source: 'Jira', ticket: 'RAS-134', status: 'Review', due: '', notes: 'Pricing workshop agenda under review.', url: '' },
+  { id: 'MUS-69', updatedAt: '2026-03-23T12:22:20.795-04:00', priority: 'Medium', task: 'Multicolumn > Add video upload', project: 'MUSH', source: 'Jira', ticket: 'MUS-69', status: 'QA', due: '', notes: 'Multicolumn module video upload feature in QA.', url: '' },
+  { id: 'MUS-28', updatedAt: '2026-03-23T12:22:16.704-04:00', priority: 'Medium', task: 'Stores Logo Module > Update text style and add link', project: 'MUSH', source: 'Jira', ticket: 'MUS-28', status: 'QA', due: '', notes: 'Logo module text style update and link addition in QA.', url: '' },
+  { id: 'MUS-31', updatedAt: '2026-03-23T12:22:10.695-04:00', priority: 'Medium', task: 'Dev: Featured Collection Section > ATC Buttons', project: 'MUSH', source: 'Jira', ticket: 'MUS-31', status: 'QA', due: '', notes: 'Add to Cart buttons on Featured Collection section in QA.', url: '' },
+  { id: 'MCK-192', updatedAt: '2026-03-20T09:37:42.583-04:00', priority: 'Medium', task: 'DTC | New Content Block - Upsell Virtual Bundle', project: 'McCormick', source: 'Jira', ticket: 'MCK-192', status: 'Client Review', due: '', notes: 'New upsell virtual bundle content block awaiting client review.', url: '' },
+  { id: 'MCK-370', updatedAt: '2026-03-18T15:23:07.951-04:00', priority: 'Medium', task: 'Review Batch 1 designs', project: 'McCormick', source: 'Jira', ticket: 'MCK-370', status: 'Open', due: '', notes: 'Batch 1 Flavor Solutions designs pending review.', url: '' },
+  { id: 'MCK-368', updatedAt: '2026-03-18T15:23:07.702-04:00', priority: 'Medium', task: 'Review Batch 3 designs', project: 'McCormick', source: 'Jira', ticket: 'MCK-368', status: 'Open', due: '', notes: 'Batch 3 Flavor Solutions designs pending review.', url: '' },
+  { id: 'MCK-366', updatedAt: '2026-03-18T15:23:07.255-04:00', priority: 'Medium', task: 'Review Batch 2 designs', project: 'McCormick', source: 'Jira', ticket: 'MCK-366', status: 'Open', due: '', notes: 'Batch 2 Flavor Solutions designs pending review.', url: '' },
+  { id: 'MCK-362', updatedAt: '2026-03-18T15:23:05.603-04:00', priority: 'Medium', task: 'Review Batch 4 designs', project: 'McCormick', source: 'Jira', ticket: 'MCK-362', status: 'Open', due: '', notes: 'Batch 4 Flavor Solutions designs pending review.', url: '' },
+  { id: 'MCK-373', updatedAt: '2026-03-18T15:22:58.022-04:00', priority: 'Medium', task: 'Asset Creation for New Product Main Images', project: 'McCormick', source: 'Jira', ticket: 'MCK-373', status: 'Open', due: '', notes: 'Creating main product image assets for new McCormick products.', url: '' },
+  { id: 'MCK-343', updatedAt: '2026-03-18T15:22:53.505-04:00', priority: 'Medium', task: 'Photography Style Guide', project: 'McCormick', source: 'Jira', ticket: 'MCK-343', status: 'Open', due: '', notes: 'McCormick photography style guide in progress.', url: '' },
+  { id: 'MCK-306', updatedAt: '2026-03-18T15:22:17.541-04:00', priority: 'Medium', task: 'Mobile Optimizations', project: 'McCormick', source: 'Jira', ticket: 'MCK-306', status: 'Feedback', due: '', notes: 'Mobile optimization changes received feedback, awaiting revisions.', url: '' },
+  { id: 'MCK-316', updatedAt: '2026-03-18T15:22:11.427-04:00', priority: 'Medium', task: 'Adjust Tolstoy video height to fit edges', project: 'McCormick', source: 'Jira', ticket: 'MCK-316', status: 'Feedback', due: '', notes: 'Tolstoy video height adjustment pending feedback resolution.', url: '' },
+  { id: 'MCK-172', updatedAt: '2026-03-18T15:21:33.174-04:00', priority: 'Medium', task: 'Cholula Nav Bar Icon', project: 'McCormick', source: 'Jira', ticket: 'MCK-172', status: 'Client Review', due: '', notes: 'Cholula navigation bar icon update awaiting client review.', url: '' },
+  { id: 'RAS-56', updatedAt: '2026-03-12T10:24:07.533-04:00', priority: 'Medium', task: 'Design - Batch A - Client Feedback', project: "Rastelli's", source: 'Jira', ticket: 'RAS-56', status: 'Review', due: '', notes: 'Batch A designs incorporating client feedback, under internal review.', url: '' },
+  { id: 'MCK-92', updatedAt: '2026-02-27T11:07:30.101-05:00', priority: 'Medium', task: 'Cholula Updated Branding Review', project: 'McCormick', source: 'Jira', ticket: 'MCK-92', status: 'Open', due: '', notes: 'Review of updated Cholula branding assets.', url: '' },
+  { id: 'MCK-33', updatedAt: '2026-02-11T13:34:38.900-05:00', priority: 'Medium', task: 'Update Figma Files for UAT', project: 'McCormick', source: 'Jira', ticket: 'MCK-33', status: 'Client Review', due: '', notes: 'Figma files updated for UAT, awaiting client sign-off.', url: '' },
+  { id: 'MUS-72', updatedAt: '2026-03-23T12:22:25.937-04:00', priority: 'Medium', task: 'Dev: Homepage Updates', project: 'MUSH', source: 'Jira', ticket: 'MUS-72', status: 'In Review', due: '', notes: 'Homepage updates resolved.', url: '' },
+  { id: 'MUS-29', updatedAt: '2026-03-23T12:22:19.396-04:00', priority: 'Medium', task: 'Global > Icons Module > Lift to 6 per line', project: 'MUSH', source: 'Jira', ticket: 'MUS-29', status: 'In Review', due: '', notes: 'Icons module layout resolved.', url: '' },
+  { id: 'MUS-32', updatedAt: '2026-03-23T12:22:11.482-04:00', priority: 'Medium', task: 'Dev: Header', project: 'MUSH', source: 'Jira', ticket: 'MUS-32', status: 'In Review', due: '', notes: 'Header dev work resolved.', url: '' },
+  { id: 'slack-kate-sams-images', updatedAt: '2026-04-01T09:07:00-04:00', priority: 'High', task: "Review Sam's Club page images (Hero, Product, Icons)", project: '#mccormick-retainer', source: 'Slack', ticket: '', status: 'Action Item', due: '2026-04-01', notes: 'Kate Ma shared updated Figma images for the Sam\'s Club page. Needs review and approval today.', url: 'https://www.figma.com/design/Jh6GNEc3jPUbKRq1F9whwP/McC-Retainer-Tasks?node-id=2186-40' },
+  { id: 'slack-kate-figma-access', updatedAt: '2026-03-26T07:25:00-04:00', priority: 'High', task: 'Grant Kate Figma edit access to McCormick files', project: '#barrel-design', source: 'Slack', ticket: '', status: 'Action Item', due: '', notes: 'Kate Ma requested edit access to McC Retainer Tasks and McC International Brands Figma files.', url: 'https://www.figma.com/design/Jh6GNEc3jPUbKRq1F9whwP/McC-Retainer-Tasks?node-id=986-26' },
+  { id: 'slack-figma-mcp-confirm', updatedAt: '2026-03-25T11:26:00-04:00', priority: 'Medium', task: 'Confirm Figma MCP server configuration in #barrel-design', project: '#barrel-design', source: 'Slack', ticket: '', status: 'Action Item', due: '', notes: 'Christine asked Isaac, Hannah, and Thao to confirm Figma MCP setup with a checkmark reply.', url: 'https://help.figma.com/hc/en-us/articles/32132100833559-Guide-to-the-Figma-MCP-server' },
+  { id: 'slack-madison-uk-feedback', updatedAt: '2026-03-26T06:12:00-04:00', priority: 'Medium', task: 'Review McCormick UK Design Feedback (MCK-1452)', project: '#mccormick-production-internal', source: 'Slack', ticket: 'MCK-1452', status: 'Action Item', due: '', notes: 'Madison Stone shared UK design feedback. Confirm with Natalie whether to walk through it together.', url: 'https://barrel.atlassian.net/browse/MCK-1452' },
+  { id: 'email-mck-sitemap-workshop', updatedAt: '2026-04-01T14:43:03Z', priority: 'High', task: 'McCormick Flavor Solutions Site Map Workshop — client reply', project: 'McCormick', source: 'Email', ticket: '', status: 'Reply Needed', due: '', notes: 'Mackenzie Moeller replied approving the product line structure and vanilla content plan. Needs acknowledgment or next steps.', url: 'https://mail.google.com/mail/u/0/#inbox/19d497f8c921b283' }
+];
+const EVENTS = [
+  { title: 'Lunch', start: '2026-04-01T12:30:00-04:00', end: '2026-04-01T13:00:00-04:00', allDay: false, response: '', attendees: 0, platform: '', joinUrl: '', personal: true },
+  { title: 'Email Strategy & Learning Session', start: '2026-04-01T13:00:00-04:00', end: '2026-04-01T13:30:00-04:00', allDay: false, response: 'needsAction', attendees: 7, platform: '', joinUrl: '' },
+  { title: 'Creative Juice', start: '2026-04-01T13:00:00-04:00', end: '2026-04-01T13:30:00-04:00', allDay: false, response: 'needsAction', attendees: 6, platform: '', joinUrl: '' },
+  { title: 'Project AI', start: '2026-04-01T13:30:00-04:00', end: '2026-04-01T14:00:00-04:00', allDay: false, response: 'needsAction', attendees: 10, platform: '', joinUrl: '' },
+  { title: 'Thursday Creative Stand Up', start: '2026-04-02T11:15:00-04:00', end: '2026-04-02T11:30:00-04:00', allDay: false, response: 'needsAction', attendees: 6, platform: '', joinUrl: '' },
+  { title: 'DTM: AI Workshop & Brainstorm', start: '2026-04-02T12:00:00-04:00', end: '2026-04-02T13:00:00-04:00', allDay: false, response: 'needsAction', attendees: 6, platform: '', joinUrl: '' },
+  { title: 'Lunch', start: '2026-04-02T12:30:00-04:00', end: '2026-04-02T13:00:00-04:00', allDay: false, response: '', attendees: 0, platform: '', joinUrl: '', personal: true },
+  { title: 'Barrel Social', start: '2026-04-02T16:30:00-04:00', end: '2026-04-02T17:00:00-04:00', allDay: false, response: 'needsAction', attendees: 25, platform: '', joinUrl: '' },
+  { title: 'Barrel Half-Day Fridays', start: '2026-04-03', end: '2026-04-04', allDay: true, response: 'needsAction', attendees: 3, platform: '', joinUrl: '' },
+  { title: 'Weekly Creative Reflection', start: '2026-04-03T11:00:00-04:00', end: '2026-04-03T11:30:00-04:00', allDay: false, response: 'needsAction', attendees: 6, platform: '', joinUrl: '' },
+  { title: 'Design <> Dev Style Guide Check-In', start: '2026-04-03T11:30:00-04:00', end: '2026-04-03T12:00:00-04:00', allDay: false, response: 'declined', attendees: 3, platform: 'zoom', joinUrl: 'https://us04web.zoom.us/j/79334806994?pwd=6lsVVxEI7GxkX33lNaBrnKQbsWUQjn.1' },
+  { title: 'Lunch', start: '2026-04-03T12:30:00-04:00', end: '2026-04-03T13:00:00-04:00', allDay: false, response: '', attendees: 0, platform: '', joinUrl: '', personal: true },
+  { title: 'Creative Juice Planning', start: '2026-04-03T13:00:00-04:00', end: '2026-04-03T13:15:00-04:00', allDay: false, response: '', attendees: 0, platform: '', joinUrl: '', personal: true },
+  { title: 'Update Harvest', start: '2026-04-03T13:30:00-04:00', end: '2026-04-03T13:45:00-04:00', allDay: false, response: '', attendees: 0, platform: '', joinUrl: '', personal: true },
+  { title: 'Weekly Creative Planning', start: '2026-04-06T11:00:00-04:00', end: '2026-04-06T11:15:00-04:00', allDay: false, response: 'needsAction', attendees: 6, platform: '', joinUrl: '' },
+  { title: 'Hannah x Isaac Bi-Weekly', start: '2026-04-06T11:30:00-04:00', end: '2026-04-06T12:00:00-04:00', allDay: false, response: 'accepted', attendees: 2, platform: '', joinUrl: '' },
+  { title: '(Internal) McCormick - Weekly Status', start: '2026-04-06T11:30:00-04:00', end: '2026-04-06T12:00:00-04:00', allDay: false, response: 'needsAction', attendees: 5, platform: '', joinUrl: '' },
+  { title: 'Lunch', start: '2026-04-06T12:30:00-04:00', end: '2026-04-06T13:00:00-04:00', allDay: false, response: '', attendees: 0, platform: '', joinUrl: '', personal: true },
+  { title: '(Internal) McCormick Design Sync', start: '2026-04-06T13:30:00-04:00', end: '2026-04-06T14:00:00-04:00', allDay: false, response: 'needsAction', attendees: 6, platform: '', joinUrl: '' },
+  { title: "(Internal) Rastelli's Weekly Status Meeting", start: '2026-04-06T15:00:00-04:00', end: '2026-04-06T15:30:00-04:00', allDay: false, response: 'needsAction', attendees: 8, platform: '', joinUrl: '' },
+  { title: '(Internal) McCormick Flavor Solutions - Weekly Status', start: '2026-04-06T16:00:00-04:00', end: '2026-04-06T16:30:00-04:00', allDay: false, response: 'needsAction', attendees: 7, platform: '', joinUrl: '' },
+  { title: 'Tuesday Creative Standup', start: '2026-04-07T11:15:00-04:00', end: '2026-04-07T11:30:00-04:00', allDay: false, response: 'needsAction', attendees: 6, platform: '', joinUrl: '' },
+  { title: 'Tuesday Meetup: Digioh', start: '2026-04-07T12:30:00-04:00', end: '2026-04-07T13:00:00-04:00', allDay: false, response: 'needsAction', attendees: 28, platform: '', joinUrl: '' },
+  { title: 'Lunch', start: '2026-04-07T12:30:00-04:00', end: '2026-04-07T13:00:00-04:00', allDay: false, response: '', attendees: 0, platform: '', joinUrl: '', personal: true },
+  { title: 'McCormick Design Sync', start: '2026-04-07T13:00:00-04:00', end: '2026-04-07T13:30:00-04:00', allDay: false, response: 'accepted', attendees: 2, platform: '', joinUrl: '' },
+  { title: 'Isaac Out', start: '2026-04-07T17:30:00-04:00', end: '2026-04-07T18:00:00-04:00', allDay: false, response: '', attendees: 0, platform: '', joinUrl: '', personal: true },
+  { title: 'Lunch', start: '2026-04-08T12:30:00-04:00', end: '2026-04-08T13:00:00-04:00', allDay: false, response: '', attendees: 0, platform: '', joinUrl: '', personal: true },
+  { title: 'Thao <> Isaac Sync', start: '2026-04-08T13:00:00-04:00', end: '2026-04-08T13:30:00-04:00', allDay: false, response: 'needsAction', attendees: 2, platform: '', joinUrl: '' },
+  { title: "DTM: Kayla's End of Practicum Show & Tell", start: '2026-04-08T13:00:00-04:00', end: '2026-04-08T13:30:00-04:00', allDay: false, response: 'needsAction', attendees: 6, platform: '', joinUrl: '' },
+  { title: 'Project AI', start: '2026-04-08T13:30:00-04:00', end: '2026-04-08T14:00:00-04:00', allDay: false, response: 'needsAction', attendees: 10, platform: '', joinUrl: '' },
+  { title: 'McCormick Flavor Solutions — Batch A/B/C/D Presentation', start: '2026-04-08T14:00:00-04:00', end: '2026-04-08T15:00:00-04:00', allDay: false, response: 'needsAction', attendees: 16, platform: 'teams', joinUrl: '' },
+  { title: 'Thursday Creative Stand Up', start: '2026-04-09T11:15:00-04:00', end: '2026-04-09T11:30:00-04:00', allDay: false, response: 'needsAction', attendees: 6, platform: '', joinUrl: '' },
+  { title: 'Design <> Dev: Monthly Sync (AI Process & BBF)', start: '2026-04-09T12:00:00-04:00', end: '2026-04-09T13:00:00-04:00', allDay: false, response: 'needsAction', attendees: 8, platform: '', joinUrl: '' },
+  { title: 'Lunch', start: '2026-04-09T12:30:00-04:00', end: '2026-04-09T13:00:00-04:00', allDay: false, response: '', attendees: 0, platform: '', joinUrl: '', personal: true },
+  { title: 'LIFT: Isaac/Christine', start: '2026-04-09T13:35:00-04:00', end: '2026-04-09T14:00:00-04:00', allDay: false, response: 'needsAction', attendees: 2, platform: '', joinUrl: '' },
+  { title: 'Barrel Half-Day Fridays', start: '2026-04-10', end: '2026-04-11', allDay: true, response: 'needsAction', attendees: 3, platform: '', joinUrl: '' },
+  { title: 'Weekly Creative Reflection', start: '2026-04-10T10:45:00-04:00', end: '2026-04-10T11:00:00-04:00', allDay: false, response: 'needsAction', attendees: 6, platform: '', joinUrl: '' },
+  { title: 'Design <> Dev Style Guide Check-In', start: '2026-04-10T11:30:00-04:00', end: '2026-04-10T12:00:00-04:00', allDay: false, response: 'declined', attendees: 3, platform: 'zoom', joinUrl: 'https://us04web.zoom.us/j/79334806994?pwd=6lsVVxEI7GxkX33lNaBrnKQbsWUQjn.1' },
+  { title: 'Lunch', start: '2026-04-10T12:30:00-04:00', end: '2026-04-10T13:00:00-04:00', allDay: false, response: '', attendees: 0, platform: '', joinUrl: '', personal: true },
+  { title: 'Creative Juice Planning', start: '2026-04-10T13:00:00-04:00', end: '2026-04-10T13:15:00-04:00', allDay: false, response: '', attendees: 0, platform: '', joinUrl: '', personal: true },
+  { title: 'Update Harvest', start: '2026-04-10T13:30:00-04:00', end: '2026-04-10T13:45:00-04:00', allDay: false, response: '', attendees: 0, platform: '', joinUrl: '', personal: true },
+  { title: 'Weekly Creative Planning', start: '2026-04-13T11:00:00-04:00', end: '2026-04-13T11:15:00-04:00', allDay: false, response: 'needsAction', attendees: 6, platform: '', joinUrl: '' },
+  { title: '(Internal) McCormick - Weekly Status', start: '2026-04-13T11:30:00-04:00', end: '2026-04-13T12:00:00-04:00', allDay: false, response: 'needsAction', attendees: 5, platform: '', joinUrl: '' },
+  { title: 'Lunch', start: '2026-04-13T12:30:00-04:00', end: '2026-04-13T13:00:00-04:00', allDay: false, response: '', attendees: 0, platform: '', joinUrl: '', personal: true },
+  { title: '(Internal) McCormick Design Sync', start: '2026-04-13T13:30:00-04:00', end: '2026-04-13T14:00:00-04:00', allDay: false, response: 'needsAction', attendees: 6, platform: '', joinUrl: '' },
+  { title: "(Internal) Rastelli's Weekly Status Meeting", start: '2026-04-13T15:00:00-04:00', end: '2026-04-13T15:30:00-04:00', allDay: false, response: 'needsAction', attendees: 8, platform: '', joinUrl: '' },
+  { title: '(Internal) McCormick Flavor Solutions - Weekly Status', start: '2026-04-13T16:00:00-04:00', end: '2026-04-13T16:30:00-04:00', allDay: false, response: 'needsAction', attendees: 7, platform: '', joinUrl: '' },
+  { title: 'Tuesday Creative Standup', start: '2026-04-14T11:15:00-04:00', end: '2026-04-14T11:30:00-04:00', allDay: false, response: 'needsAction', attendees: 6, platform: '', joinUrl: '' },
+  { title: 'Tuesday Meetup: Q1 2026 Debrief', start: '2026-04-14T12:00:00-04:00', end: '2026-04-14T13:00:00-04:00', allDay: false, response: 'needsAction', attendees: 27, platform: '', joinUrl: '' },
+  { title: 'Lunch', start: '2026-04-14T12:30:00-04:00', end: '2026-04-14T13:00:00-04:00', allDay: false, response: '', attendees: 0, platform: '', joinUrl: '', personal: true },
+  { title: 'McCormick Design Sync', start: '2026-04-14T13:00:00-04:00', end: '2026-04-14T13:30:00-04:00', allDay: false, response: 'accepted', attendees: 2, platform: '', joinUrl: '' },
+  { title: 'Isaac Out', start: '2026-04-14T17:30:00-04:00', end: '2026-04-14T18:00:00-04:00', allDay: false, response: '', attendees: 0, platform: '', joinUrl: '', personal: true },
+  { title: 'Lunch', start: '2026-04-15T12:30:00-04:00', end: '2026-04-15T13:00:00-04:00', allDay: false, response: '', attendees: 0, platform: '', joinUrl: '', personal: true },
+  { title: 'Thao <> Isaac Sync', start: '2026-04-15T13:00:00-04:00', end: '2026-04-15T13:30:00-04:00', allDay: false, response: 'needsAction', attendees: 2, platform: '', joinUrl: '' },
+  { title: 'Creative Juice', start: '2026-04-15T13:00:00-04:00', end: '2026-04-15T13:30:00-04:00', allDay: false, response: 'needsAction', attendees: 6, platform: '', joinUrl: '' },
+  { title: 'Project AI', start: '2026-04-15T13:30:00-04:00', end: '2026-04-15T14:00:00-04:00', allDay: false, response: 'needsAction', attendees: 10, platform: '', joinUrl: '' },
+  { title: 'LIFT: Isaac/Christine', start: '2026-04-15T14:05:00-04:00', end: '2026-04-15T14:30:00-04:00', allDay: false, response: 'needsAction', attendees: 2, platform: '', joinUrl: '' }
+];
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('day-title').textContent =
+    new Date().toLocaleDateString('en-US', { weekday: 'long' });
+  document.getElementById('updated-time').textContent =
+    'Data pulled ' + new Date(DATA_PULLED_AT).toLocaleString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+    });
+
+  function getDismissed() {
+    try { return JSON.parse(sessionStorage.getItem('dismissed') || '[]'); } catch(e) { return []; }
+  }
+  function saveDismissed(arr) { sessionStorage.setItem('dismissed', JSON.stringify(arr)); }
+
+  function renderStats() {
+    const d = getDismissed();
+    const v = TASKS.filter(t => !d.includes(t.id));
+    document.getElementById('stat-open').textContent  = v.filter(t => t.status !== 'Done').length;
+    document.getElementById('stat-high').textContent  = v.filter(t => t.priority === 'High').length;
+    document.getElementById('stat-jira').textContent  = v.filter(t => t.source === 'Jira').length;
+    document.getElementById('stat-inbox').textContent = v.filter(t => t.source === 'Slack' || t.source === 'Email').length;
+  }
+
+  let activeSrc = 'all', activePri = '';
+
+  function renderTasks() {
+    const dismissed = getDismissed();
+    const priOrder = { High: 0, Medium: 1, Low: 2 };
+    const tasks = TASKS.slice().sort((a, b) => {
+      const pd = (priOrder[a.priority] != null ? priOrder[a.priority] : 1) - (priOrder[b.priority] != null ? priOrder[b.priority] : 1);
+      return pd !== 0 ? pd : new Date(b.updatedAt) - new Date(a.updatedAt);
+    });
+
+    const list = document.getElementById('task-list');
+    list.innerHTML = '';
+    let shown = 0;
+
+    tasks.forEach(function(task) {
+      if (activeSrc !== 'all' && task.source !== activeSrc) return;
+      const priMap = { High: 'High', Med: 'Medium', Low: 'Low' };
+      if (activePri && task.priority !== (priMap[activePri] || activePri)) return;
+      shown++;
+
+      const isDismissed = dismissed.includes(task.id);
+      const priClass = task.priority === 'High' ? 'high' : task.priority === 'Medium' ? 'med' : 'low';
+      const card = document.createElement('div');
+      card.className = 'task-card' + (task.status === 'Done' ? ' done' : '') + (isDismissed ? ' dismissed' : '');
+      card.dataset.id = task.id;
+      card.innerHTML =
+        '<div class="task-bar ' + priClass + '"></div>' +
+        '<div class="task-body">' +
+          '<div class="task-title">' + esc(task.task) + '</div>' +
+          '<div class="task-meta">' +
+            '<span>' + esc(task.project) + '</span>' +
+            (task.ticket ? '<span>' + esc(task.ticket) + '</span>' : '') +
+            (task.status ? '<span>' + esc(task.status) + '</span>' : '') +
+          '</div>' +
+          (task.notes ? '<div class="task-notes">' + esc(task.notes) + '</div>' : '') +
+        '</div>' +
+        '<div class="task-aside">' +
+          '<span class="source-pill ' + task.source.toLowerCase() + '">' + esc(task.source) + '</span>' +
+          '<span class="task-time">' + relTime(task.updatedAt) + '</span>' +
+          '<button class="dismiss-btn" title="Dismiss">\u00d7</button>' +
+        '</div>';
+
+      card.addEventListener('click', function() { if (task.url) window.open(task.url, '_blank'); });
+      card.querySelector('.dismiss-btn').addEventListener('click', function(e) {
+        e.stopPropagation();
+        const d = getDismissed();
+        if (!d.includes(task.id)) d.push(task.id);
+        saveDismissed(d);
+        card.classList.add('dismissed');
+        renderStats();
+      });
+      list.appendChild(card);
+    });
+
+    if (shown === 0) list.innerHTML = '<p style="color:var(--t3);font-size:12px;padding:24px 0;">No tasks</p>';
+  }
+
+  function renderCalendar() {
+    const sorted = EVENTS.slice().sort(function(a, b) { return new Date(a.start) - new Date(b.start); });
+    const groups = {};
+    sorted.forEach(function(ev) {
+      const key = ev.allDay ? ev.start.slice(0,10) : new Date(ev.start).toLocaleDateString('en-CA');
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(ev);
+    });
+    let html = '<p class="section-label">Next 14 days</p>';
+    Object.keys(groups).sort().forEach(function(k) {
+      const d = new Date(k + 'T00:00:00');
+      const head = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).replace(',', ' \u00b7');
+      html += '<div class="cal-group"><div class="cal-date-head">' + head + '</div>';
+      groups[k].forEach(function(ev) {
+        const t = ev.allDay ? 'All day' : new Date(ev.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        const isPersonal = ev.personal === true;
+        html += '<div class="cal-row' + (isPersonal ? ' personal' : '') + '">' +
+          '<span class="cal-time">' + t + '</span>' +
+          '<span class="cal-title">' + esc(ev.title) + (ev.response === 'needsAction' ? '<span class="needs-dot"></span>' : '') + '</span>' +
+          '<div class="cal-badges">' +
+            (ev.platform ? '<span class="platform-pill ' + ev.platform + '">' + ev.platform + '</span>' : '') +
+            (ev.joinUrl ? '<a class="cal-join" href="' + ev.joinUrl + '" target="_blank">Join</a>' : '') +
+          '</div></div>';
+      });
+      html += '</div>';
+    });
+    document.getElementById('cal-panel').innerHTML = html;
+  }
+
+  document.querySelectorAll('.filter-pill').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      const f = btn.dataset.filter, type = btn.dataset.type;
+      if (type === 'src') {
+        activeSrc = f;
+        document.querySelectorAll('.filter-pill[data-type="src"]').forEach(function(b) { b.classList.toggle('active', b.dataset.filter === f); });
+      } else {
+        activePri = activePri === f ? '' : f;
+        document.querySelectorAll('.filter-pill[data-type="pri"]').forEach(function(b) { b.classList.toggle('active', b.dataset.filter === activePri); });
+      }
+      renderTasks();
+    });
+  });
+
+  function relTime(iso) {
+    const diff = Date.now() - new Date(iso).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 60) return m + 'm ago';
+    const h = Math.floor(m / 60);
+    if (h < 24) return h + 'h ago';
+    return Math.floor(h / 24) + 'd ago';
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  renderStats();
+  renderTasks();
+  renderCalendar();
+});
+</script>
+</body>
+</html>
